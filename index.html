@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Braille Draw</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111;
+    --surface-2: #1a1a1a;
+    --border: #222;
+    --border-hover: #333;
+    --text: #e5e5e5;
+    --text-dim: #666;
+    --accent: #fff;
+    --dot-off: #1a1a1a;
+    --dot-hover: #2a2a2a;
+    --dot-on: #e5e5e5;
+    --radius: 6px;
+    --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  h1 {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 32px;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .control-group label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  select, button {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    outline: none;
+  }
+
+  select:hover, button:hover {
+    border-color: var(--border-hover);
+    background: var(--surface-2);
+  }
+
+  select:focus, button:focus-visible {
+    border-color: #444;
+  }
+
+  .btn-accent {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  .btn-accent:hover {
+    background: #ccc;
+    border-color: #ccc;
+  }
+
+  .sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+  }
+
+  /* Mode toggle */
+  .mode-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .mode-toggle button {
+    border: none;
+    border-radius: 0;
+    padding: 6px 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .mode-toggle button.active {
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  .mode-toggle button:not(.active):hover {
+    background: var(--surface-2);
+  }
+
+  /* Main layout */
+  .main {
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Grid */
+  .grid-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .grid-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .grid-container {
+    display: inline-flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    background: var(--surface);
+    gap: 0;
+  }
+
+  .grid-row {
+    display: flex;
+    gap: 0;
+  }
+
+  /* Cell separator lines between braille cells */
+  .grid-container[data-show-guides="true"] .grid-row:not(:last-child) {
+    /* Handled via dot borders instead */
+  }
+
+  .dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--dot-off);
+    cursor: pointer;
+    transition: background 0.1s, transform 0.1s, box-shadow 0.1s;
+    margin: 3px;
+    position: relative;
+  }
+
+  .dot:hover {
+    background: var(--dot-hover);
+    transform: scale(1.1);
+  }
+
+  .dot.on {
+    background: var(--dot-on);
+    box-shadow: 0 0 8px rgba(255,255,255,0.15);
+  }
+
+  .dot.on:hover {
+    background: #ccc;
+  }
+
+  /* Braille cell guides */
+  .dot.cell-right-edge {
+    margin-right: 10px;
+  }
+
+  .dot.cell-bottom-edge {
+    margin-bottom: 10px;
+  }
+
+  /* Output */
+  .output-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 200px;
+  }
+
+  .output-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .output-header span {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .copy-btn {
+    font-size: 10px;
+    padding: 3px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .copy-btn.copied {
+    color: #4ade80;
+    border-color: #4ade80;
+  }
+
+  .output-content {
+    font-family: var(--mono);
+    font-size: 24px;
+    line-height: 1.2;
+    word-break: break-all;
+    white-space: pre;
+    min-height: 36px;
+    color: var(--accent);
+  }
+
+  .output-content.ascii {
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--text);
+  }
+
+  .output-content.hex {
+    font-size: 12px;
+    color: var(--text-dim);
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  /* Presets */
+  .presets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+
+  .preset-btn {
+    font-size: 18px;
+    padding: 4px 8px;
+    line-height: 1;
+    background: var(--surface);
+  }
+
+  /* Footer info */
+  .info {
+    margin-top: 32px;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.6;
+    max-width: 500px;
+  }
+
+  .info kbd {
+    font-family: var(--mono);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 10px;
+  }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .main { flex-direction: column; align-items: center; }
+    .dot { width: 24px; height: 24px; margin: 2px; }
+    .dot.cell-right-edge { margin-right: 8px; }
+    .dot.cell-bottom-edge { margin-bottom: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Braille Draw</h1>
+
+<div class="controls">
+  <div class="control-group">
+    <label>Cells</label>
+    <select id="cols">
+      <option value="1">1</option>
+      <option value="2" selected>2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="8">8</option>
+      <option value="10">10</option>
+    </select>
+    <span style="color:var(--text-dim);font-size:11px">&times;</span>
+    <select id="rows">
+      <option value="1" selected>1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+    </select>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="mode-toggle">
+    <button id="mode-draw" class="active" onclick="setMode('draw')">Draw</button>
+    <button id="mode-erase" onclick="setMode('erase')">Erase</button>
+  </div>
+
+  <div class="sep"></div>
+
+  <button onclick="fillAll()">Fill</button>
+  <button onclick="invertAll()">Invert</button>
+  <button onclick="clearGrid()">Clear</button>
+</div>
+
+<div class="main">
+  <div class="grid-wrap">
+    <div class="grid-label" id="grid-label">2 &times; 4 pixels &mdash; 1 char</div>
+    <div class="grid-container" id="grid" data-show-guides="true"></div>
+  </div>
+
+  <div class="output-wrap">
+    <div class="output-section">
+      <div class="output-header">
+        <span>Braille</span>
+        <button class="copy-btn" onclick="copyOutput('braille', this)">Copy</button>
+      </div>
+      <div class="output-content" id="out-braille">⠀</div>
+    </div>
+
+    <div class="output-section">
+      <div class="output-header">
+        <span>Unicode</span>
+        <button class="copy-btn" onclick="copyOutput('unicode', this)">Copy</button>
+      </div>
+      <div class="output-content hex" id="out-unicode">U+2800</div>
+    </div>
+
+    <div class="output-section">
+      <div class="output-header">
+        <span>ASCII</span>
+        <button class="copy-btn" onclick="copyOutput('ascii', this)">Copy</button>
+      </div>
+      <div class="output-content ascii" id="out-ascii"></div>
+    </div>
+
+    <div class="output-section">
+      <div class="output-header">
+        <span>Termdot Input</span>
+        <button class="copy-btn" onclick="copyOutput('termdot', this)">Copy</button>
+      </div>
+      <div class="output-content hex" id="out-termdot"></div>
+    </div>
+
+    <div class="output-section">
+      <div class="output-header">
+        <span>JavaScript</span>
+        <button class="copy-btn" onclick="copyOutput('js', this)">Copy</button>
+      </div>
+      <div class="output-content hex" id="out-js"></div>
+    </div>
+  </div>
+</div>
+
+<div class="info">
+  Click dots to toggle. Click + drag to paint.
+  Hold <kbd>Shift</kbd> to erase while dragging.
+</div>
+
+<script>
+// ── Braille bit mapping ──
+// Dot positions in a 2×4 cell (col, row) → bit value
+// Layout:
+//   row 0: dot1(0x01) dot4(0x08)
+//   row 1: dot2(0x02) dot5(0x10)
+//   row 2: dot3(0x04) dot6(0x20)
+//   row 3: dot7(0x40) dot8(0x80)
+const DOT_BITS = [
+  [0x01, 0x08],  // row 0
+  [0x02, 0x10],  // row 1
+  [0x04, 0x20],  // row 2
+  [0x40, 0x80],  // row 3
+];
+
+let cellCols = 2;
+let cellRows = 1;
+let pixelW, pixelH;
+let pixels; // 2D array [row][col] of 0|1
+let mode = 'draw';
+let painting = false;
+let paintValue = 1;
+
+const gridEl = document.getElementById('grid');
+const labelEl = document.getElementById('grid-label');
+const colsEl = document.getElementById('cols');
+const rowsEl = document.getElementById('rows');
+
+function init() {
+  cellCols = parseInt(colsEl.value);
+  cellRows = parseInt(rowsEl.value);
+  pixelW = cellCols * 2;
+  pixelH = cellRows * 4;
+
+  // Preserve existing pixel data where possible
+  const oldPixels = pixels;
+  pixels = Array.from({ length: pixelH }, (_, r) =>
+    Array.from({ length: pixelW }, (_, c) =>
+      oldPixels && r < oldPixels.length && c < oldPixels[0].length ? oldPixels[r][c] : 0
+    )
+  );
+
+  buildGrid();
+  updateOutput();
+}
+
+function buildGrid() {
+  gridEl.innerHTML = '';
+
+  for (let r = 0; r < pixelH; r++) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'grid-row';
+
+    for (let c = 0; c < pixelW; c++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      if (pixels[r][c]) dot.classList.add('on');
+
+      // Add cell boundary guides
+      if (c % 2 === 1 && c < pixelW - 1) dot.classList.add('cell-right-edge');
+      if (r % 4 === 3 && r < pixelH - 1) dot.classList.add('cell-bottom-edge');
+
+      dot.dataset.r = r;
+      dot.dataset.c = c;
+
+      dot.addEventListener('pointerdown', onDotDown);
+      dot.addEventListener('pointerenter', onDotEnter);
+
+      rowEl.appendChild(dot);
+    }
+
+    gridEl.appendChild(rowEl);
+  }
+
+  // Update label
+  const totalChars = cellCols * cellRows;
+  labelEl.innerHTML = `${pixelW} &times; ${pixelH} pixels &mdash; ${totalChars} char${totalChars > 1 ? 's' : ''}`;
+}
+
+function onDotDown(e) {
+  e.preventDefault();
+  painting = true;
+
+  const r = parseInt(e.target.dataset.r);
+  const c = parseInt(e.target.dataset.c);
+
+  if (e.shiftKey) {
+    paintValue = 0;
+  } else if (mode === 'erase') {
+    paintValue = 0;
+  } else {
+    // Toggle on click
+    paintValue = pixels[r][c] ? 0 : 1;
+  }
+
+  setPixel(r, c, paintValue);
+  updateOutput();
+}
+
+function onDotEnter(e) {
+  if (!painting) return;
+  const r = parseInt(e.target.dataset.r);
+  const c = parseInt(e.target.dataset.c);
+  setPixel(r, c, paintValue);
+  updateOutput();
+}
+
+document.addEventListener('pointerup', () => { painting = false; });
+
+function setPixel(r, c, val) {
+  pixels[r][c] = val;
+  const dot = gridEl.querySelector(`.dot[data-r="${r}"][data-c="${c}"]`);
+  if (dot) dot.classList.toggle('on', !!val);
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('mode-draw').classList.toggle('active', m === 'draw');
+  document.getElementById('mode-erase').classList.toggle('active', m === 'erase');
+}
+
+function clearGrid() {
+  for (let r = 0; r < pixelH; r++)
+    for (let c = 0; c < pixelW; c++)
+      pixels[r][c] = 0;
+  buildGrid();
+  updateOutput();
+}
+
+function fillAll() {
+  for (let r = 0; r < pixelH; r++)
+    for (let c = 0; c < pixelW; c++)
+      pixels[r][c] = 1;
+  buildGrid();
+  updateOutput();
+}
+
+function invertAll() {
+  for (let r = 0; r < pixelH; r++)
+    for (let c = 0; c < pixelW; c++)
+      pixels[r][c] = pixels[r][c] ? 0 : 1;
+  buildGrid();
+  updateOutput();
+}
+
+// ── Output computation ──
+
+function computeBraille() {
+  const lines = [];
+  for (let cr = 0; cr < cellRows; cr++) {
+    let line = '';
+    for (let cc = 0; cc < cellCols; cc++) {
+      let mask = 0;
+      for (let dr = 0; dr < 4; dr++) {
+        for (let dc = 0; dc < 2; dc++) {
+          const pr = cr * 4 + dr;
+          const pc = cc * 2 + dc;
+          if (pixels[pr][pc]) {
+            mask |= DOT_BITS[dr][dc];
+          }
+        }
+      }
+      line += String.fromCodePoint(0x2800 + mask);
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+
+function computeASCII() {
+  const lines = [];
+  for (let r = 0; r < pixelH; r++) {
+    let line = '';
+    for (let c = 0; c < pixelW; c++) {
+      line += pixels[r][c] ? '##' : '..';
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+
+function computeTermdot() {
+  let str = '';
+  for (let r = 0; r < pixelH; r++) {
+    for (let c = 0; c < pixelW; c++) {
+      str += pixels[r][c] ? '*' : '.';
+    }
+  }
+  return '"' + str + '"';
+}
+
+function updateOutput() {
+  const brailleLines = computeBraille();
+  const asciiLines = computeASCII();
+
+  document.getElementById('out-braille').textContent = brailleLines.join('\n');
+
+  // Unicode codepoints
+  const unicodeStr = brailleLines.map(line =>
+    [...line].map(ch => 'U+' + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')).join(' ')
+  ).join('\n');
+  document.getElementById('out-unicode').textContent = unicodeStr;
+
+  // ASCII
+  document.getElementById('out-ascii').textContent = asciiLines.join('\n');
+
+  // Termdot input
+  document.getElementById('out-termdot').textContent = computeTermdot();
+
+  // JavaScript string
+  const jsStr = brailleLines.length === 1
+    ? `'${brailleLines[0]}'`
+    : brailleLines.map(l => `'${l}'`).join(' + \'\\n\' +\n');
+  document.getElementById('out-js').textContent = jsStr;
+}
+
+// ── Copy ──
+
+function copyOutput(type, btn) {
+  let text;
+  if (type === 'braille') text = document.getElementById('out-braille').textContent;
+  else if (type === 'unicode') text = document.getElementById('out-unicode').textContent;
+  else if (type === 'ascii') text = document.getElementById('out-ascii').textContent;
+  else if (type === 'termdot') text = document.getElementById('out-termdot').textContent;
+  else if (type === 'js') text = document.getElementById('out-js').textContent;
+
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 1200);
+  });
+}
+
+// ── Events ──
+
+colsEl.addEventListener('change', init);
+rowsEl.addEventListener('change', init);
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'c' && !e.metaKey && !e.ctrlKey) clearGrid();
+  if (e.key === 'f') fillAll();
+  if (e.key === 'i') invertAll();
+  if (e.key === 'd') setMode('draw');
+  if (e.key === 'e') setMode('erase');
+});
+
+// Init
+init();
+</script>
+
+</body>
+</html>
