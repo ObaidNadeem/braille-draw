@@ -17,7 +17,7 @@ Six export formats, all live-updating as you draw:
 | **Braille** | `⣿⣷⣾` | Direct Unicode characters |
 | **Unicode** | `U+28FF U+28F7` | Codepoint references |
 | **ASCII** | `##..##` | Text-based visualization |
-| **Termdot** | `"*..**.."` | Input for [termdot](https://github.com/obaidnadeem/termdot) |
+| **Termdot** | `"*..**.."` | Input for [termdot](https://www.npmjs.com/package/termdot) |
 | **JS** | `'⣿⣷⣾'` | Copy-paste into JavaScript |
 | **Animation** | `const frames = [...]` | Frame arrays for animated CLI graphics |
 
