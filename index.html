@@ -4,1234 +4,153 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Braille Draw</title>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0a0a0a;
-    --surface: #111;
-    --surface-2: #1a1a1a;
-    --border: #222;
-    --border-hover: #333;
-    --text: #e5e5e5;
-    --text-dim: #666;
-    --accent: #fff;
-    --dot-off: #1a1a1a;
-    --dot-hover: #2a2a2a;
-    --dot-on: #e5e5e5;
-    --radius: 6px;
-    --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
-    --sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
-  }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 40px 20px;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-
-  h1 {
-    font-size: 14px;
-    font-weight: 500;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 32px;
-  }
-
-  /* Controls */
-  .controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .control-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .control-group label {
-    font-size: 11px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  select, button {
-    font-family: var(--mono);
-    font-size: 12px;
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 6px 10px;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-    outline: none;
-  }
-
-  select:hover, button:hover {
-    border-color: var(--border-hover);
-    background: var(--surface-2);
-  }
-
-  select:focus, button:focus-visible {
-    border-color: #444;
-  }
-
-  .btn-accent {
-    background: var(--accent);
-    color: var(--bg);
-    border-color: var(--accent);
-    font-weight: 600;
-  }
-
-  .btn-accent:hover {
-    background: #ccc;
-    border-color: #ccc;
-  }
-
-  .sep {
-    width: 1px;
-    height: 20px;
-    background: var(--border);
-  }
-
-  /* Mode toggle */
-  .mode-toggle {
-    display: flex;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-
-  .mode-toggle button {
-    border: none;
-    border-radius: 0;
-    padding: 6px 12px;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .mode-toggle button.active {
-    background: var(--accent);
-    color: var(--bg);
-  }
-
-  .mode-toggle button:not(.active):hover {
-    background: var(--surface-2);
-  }
-
-  /* Main layout */
-  .main {
-    display: flex;
-    gap: 40px;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  /* Grid */
-  .grid-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .grid-label {
-    font-size: 11px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .grid-container {
-    display: inline-flex;
-    flex-direction: column;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    background: var(--surface);
-    gap: 0;
-  }
-
-  .grid-row {
-    display: flex;
-    gap: 0;
-  }
-
-  .dot {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--dot-off);
-    cursor: pointer;
-    transition: background 0.1s, transform 0.1s, box-shadow 0.1s;
-    margin: 3px;
-    position: relative;
-  }
-
-  .dot:hover {
-    background: var(--dot-hover);
-    transform: scale(1.1);
-  }
-
-  .dot.on {
-    background: var(--dot-on);
-    box-shadow: 0 0 8px rgba(255,255,255,0.15);
-  }
-
-  .dot.on:hover {
-    background: #ccc;
-  }
-
-  .dot.ghost {
-    background: #2d2520;
-    box-shadow: 0 0 6px rgba(200,120,50,0.08);
-  }
-
-  /* Braille cell guides */
-  .dot.cell-right-edge {
-    margin-right: 10px;
-  }
-
-  .dot.cell-bottom-edge {
-    margin-bottom: 10px;
-  }
-
-  /* Output */
-  .output-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    min-width: 200px;
-  }
-
-  .output-section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-  }
-
-  .output-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-  }
-
-  .output-header span {
-    font-size: 11px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .copy-btn {
-    font-size: 10px;
-    padding: 3px 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .copy-btn.copied {
-    color: #4ade80;
-    border-color: #4ade80;
-  }
-
-  .output-content {
-    font-family: var(--mono);
-    font-size: 24px;
-    line-height: 1.2;
-    word-break: break-all;
-    white-space: pre;
-    min-height: 36px;
-    color: var(--accent);
-  }
-
-  .output-content.ascii {
-    font-size: 14px;
-    line-height: 1.4;
-    color: var(--text);
-  }
-
-  .output-content.hex {
-    font-size: 12px;
-    color: var(--text-dim);
-    word-break: break-word;
-    white-space: pre-wrap;
-  }
-
-  /* Footer info */
-  .info {
-    margin-top: 32px;
-    font-size: 11px;
-    color: var(--text-dim);
-    text-align: center;
-    line-height: 1.6;
-    max-width: 500px;
-  }
-
-  .info kbd {
-    font-family: var(--mono);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 1px 5px;
-    font-size: 10px;
-  }
-
-  /* Timeline */
-  .timeline-section {
-    width: 100%;
-    max-width: 820px;
-    margin-top: 32px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .timeline-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-
-  .timeline-label {
-    font-size: 11px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .playback-controls {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .playback-controls .sep {
-    height: 16px;
-  }
-
-  .frame-counter {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-dim);
-    min-width: 50px;
-    text-align: center;
-  }
-
-  .fps-control {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .fps-control label {
-    font-size: 11px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .fps-value {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-dim);
-    min-width: 18px;
-    text-align: right;
-  }
-
-  input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 72px;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-  }
-
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-  }
-
-  input[type="range"]::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: none;
-    cursor: pointer;
-  }
-
-  .toggle-btn {
-    font-size: 11px;
-    padding: 5px 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .toggle-btn.active {
-    background: var(--accent);
-    color: var(--bg);
-    border-color: var(--accent);
-  }
-
-  .timeline-strip {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    padding: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
-    min-height: 60px;
-    align-items: stretch;
-  }
-
-  .timeline-strip::-webkit-scrollbar {
-    height: 4px;
-  }
-
-  .timeline-strip::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .timeline-strip::-webkit-scrollbar-thumb {
-    background: var(--border-hover);
-    border-radius: 2px;
-  }
-
-  .frame-thumb {
-    flex-shrink: 0;
-    min-width: 48px;
-    padding: 8px;
-    padding-top: 20px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-    position: relative;
-  }
-
-  .frame-thumb:hover {
-    border-color: var(--border-hover);
-    background: #1e1e1e;
-  }
-
-  .frame-thumb.active {
-    border-color: var(--accent);
-  }
-
-  .frame-num {
-    position: absolute;
-    top: 4px;
-    left: 6px;
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--text-dim);
-    line-height: 1;
-  }
-
-  .frame-preview {
-    font-family: var(--mono);
-    font-size: 12px;
-    line-height: 1.1;
-    white-space: pre;
-    text-align: center;
-    color: var(--text);
-  }
-
-  .frame-add-btn {
-    flex-shrink: 0;
-    width: 40px;
-    min-width: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: 1px dashed var(--border);
-    border-radius: 4px;
-    color: var(--text-dim);
-    font-size: 18px;
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
-  }
-
-  .frame-add-btn:hover {
-    border-color: var(--border-hover);
-    color: var(--text);
-    background: transparent;
-  }
-
-  .frame-actions {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .frame-actions .sep {
-    height: 16px;
-  }
-
-  .anim-header-right {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
-
-  .anim-format-select {
-    font-size: 10px;
-    padding: 3px 6px;
-  }
-
-  /* Responsive */
-  @media (max-width: 700px) {
-    .main { flex-direction: column; align-items: center; }
-    .dot { width: 24px; height: 24px; margin: 2px; }
-    .dot.cell-right-edge { margin-right: 8px; }
-    .dot.cell-bottom-edge { margin-bottom: 8px; }
-    .timeline-section { max-width: 100%; }
-    .playback-controls { justify-content: center; }
-    .timeline-header { justify-content: center; }
-  }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h1>Braille Draw</h1>
-
-<div class="controls">
-  <div class="control-group">
-    <label>Cells</label>
-    <select id="cols">
-      <option value="1">1</option>
-      <option value="2" selected>2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="5">5</option>
-      <option value="6">6</option>
-      <option value="8">8</option>
-      <option value="10">10</option>
-    </select>
-    <span style="color:var(--text-dim);font-size:11px">&times;</span>
-    <select id="rows">
-      <option value="1" selected>1</option>
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="5">5</option>
-      <option value="6">6</option>
-    </select>
-  </div>
-
-  <div class="sep"></div>
-
-  <div class="mode-toggle">
-    <button id="mode-draw" class="active" onclick="setMode('draw')">Draw</button>
-    <button id="mode-erase" onclick="setMode('erase')">Erase</button>
-  </div>
-
-  <div class="sep"></div>
-
-  <button onclick="fillAll()">Fill</button>
-  <button onclick="invertAll()">Invert</button>
-  <button onclick="clearGrid()">Clear</button>
-</div>
-
-<div class="main">
-  <div class="grid-wrap">
-    <div class="grid-label" id="grid-label">2 &times; 4 pixels &mdash; 1 char</div>
+<!-- Workspace -->
+<div class="workspace">
+  <div class="canvas-area">
+    <div class="grid-label" id="grid-label">4 &times; 4 pixels &mdash; 2 chars</div>
     <div class="grid-container" id="grid" data-show-guides="true"></div>
+    <div class="floating-toolbar">
+      <label for="cols">Cells</label>
+      <select id="cols">
+        <option value="1">1</option>
+        <option value="2" selected>2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="8">8</option>
+        <option value="10">10</option>
+      </select>
+      <span class="dim">&times;</span>
+      <select id="rows" aria-label="Cell rows">
+        <option value="1" selected>1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+      </select>
+      <div class="sep"></div>
+      <div class="mode-toggle" role="group" aria-label="Draw mode">
+        <button id="mode-draw" class="active" onclick="setMode('draw')">Draw</button>
+        <button id="mode-erase" onclick="setMode('erase')">Erase</button>
+      </div>
+      <div class="sep"></div>
+      <button onclick="fillAll()">Fill</button>
+      <button onclick="invertAll()">Invert</button>
+      <button onclick="clearGrid()">Clear</button>
+    </div>
   </div>
 
-  <div class="output-wrap">
-    <div class="output-section">
-      <div class="output-header">
-        <span>Braille</span>
-        <button class="copy-btn" onclick="copyOutput('braille', this)">Copy</button>
+  <div class="output-sidebar">
+    <div class="sidebar-body">
+      <div class="output-section">
+        <div class="section-head"><span class="section-label">Braille</span><button class="copy-sec-btn" onclick="copySection(this, 'out-braille')">Copy</button></div>
+        <div class="output-content" id="out-braille">&#x2800;</div>
       </div>
-      <div class="output-content" id="out-braille">&#x2800;</div>
-    </div>
-
-    <div class="output-section">
-      <div class="output-header">
-        <span>Unicode</span>
-        <button class="copy-btn" onclick="copyOutput('unicode', this)">Copy</button>
+      <div class="output-section">
+        <div class="section-head"><span class="section-label">Unicode</span><button class="copy-sec-btn" onclick="copySection(this, 'out-unicode')">Copy</button></div>
+        <div class="output-content hex" id="out-unicode">U+2800</div>
       </div>
-      <div class="output-content hex" id="out-unicode">U+2800</div>
-    </div>
-
-    <div class="output-section">
-      <div class="output-header">
-        <span>ASCII</span>
-        <button class="copy-btn" onclick="copyOutput('ascii', this)">Copy</button>
+      <div class="output-section">
+        <div class="section-head"><span class="section-label">ASCII</span><button class="copy-sec-btn" onclick="copySection(this, 'out-ascii')">Copy</button></div>
+        <div class="output-content ascii" id="out-ascii"></div>
       </div>
-      <div class="output-content ascii" id="out-ascii"></div>
-    </div>
-
-    <div class="output-section">
-      <div class="output-header">
-        <span>Termdot Input</span>
-        <button class="copy-btn" onclick="copyOutput('termdot', this)">Copy</button>
+      <div class="output-section">
+        <div class="section-head"><span class="section-label">Termdot</span><button class="copy-sec-btn" onclick="copySection(this, 'out-termdot')">Copy</button></div>
+        <div class="output-content hex" id="out-termdot"></div>
       </div>
-      <div class="output-content hex" id="out-termdot"></div>
-    </div>
-
-    <div class="output-section">
-      <div class="output-header">
-        <span>JavaScript</span>
-        <button class="copy-btn" onclick="copyOutput('js', this)">Copy</button>
+      <div class="output-section">
+        <div class="section-head"><span class="section-label">JS</span><button class="copy-sec-btn" onclick="copySection(this, 'out-js')">Copy</button></div>
+        <div class="output-content hex" id="out-js"></div>
       </div>
-      <div class="output-content hex" id="out-js"></div>
-    </div>
-
-    <div class="output-section">
-      <div class="output-header">
-        <span>Animation</span>
-        <div class="anim-header-right">
-          <select id="anim-format" class="anim-format-select" onchange="updateAnimExport()">
+      <div class="output-section">
+        <div class="section-head">
+          <span class="section-label">Animation</span>
+          <select id="anim-format" onchange="updateAnimExport()" aria-label="Export format">
             <option value="js-braille">JS Braille</option>
             <option value="js-termdot">JS Termdot</option>
             <option value="js-grid">JS Grid</option>
             <option value="json">JSON</option>
           </select>
-          <button class="copy-btn" onclick="copyOutput('anim', this)">Copy</button>
+          <button class="copy-sec-btn" onclick="copySection(this, 'out-anim')">Copy</button>
+        </div>
+        <div class="output-content hex" id="out-anim"></div>
+      </div>
+      <div class="shortcuts-section">
+        <div class="section-head"><span class="section-label">Shortcuts</span></div>
+        <div class="shortcuts-cols">
+          <div class="shortcuts-grid">
+            <kbd>D</kbd><span>Draw</span>
+            <kbd>E</kbd><span>Erase</span>
+            <kbd>C</kbd><span>Clear</span>
+            <kbd>F</kbd><span>Fill</span>
+            <kbd>I</kbd><span>Invert</span>
+          </div>
+          <div class="shortcuts-grid">
+            <kbd>N</kbd><span>New frame</span>
+            <kbd>Space</kbd><span>Play</span>
+            <kbd>&larr;</kbd><span>Prev frame</span>
+            <kbd>&rarr;</kbd><span>Next frame</span>
+            <kbd>Shift</kbd><span>Erase dot</span>
+          </div>
         </div>
       </div>
-      <div class="output-content hex" id="out-anim"></div>
+      <div class="tips-section">
+        <div class="section-head"><span class="section-label">Tips</span></div>
+        <ul class="tips-list">
+          <li>Enable <strong>Onion</strong> to ghost the previous frame while drawing — helps with smooth animations.</li>
+          <li>Use <strong>Dup</strong> to duplicate a frame, then edit the copy for incremental changes.</li>
+          <li>Hold <strong>Shift + click</strong> to erase individual dots regardless of mode.</li>
+          <li>Drag across dots to paint or erase in one stroke.</li>
+          <li>Use the <strong>Animation</strong> export to get frame arrays ready for your CLI code.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <strong class="sidebar-brand">Braille Draw</strong>
+      <span>Draw braille patterns for CLI apps.</span>
+      <a href="https://github.com/ObaidNadeem/braille-draw" target="_blank" rel="noopener">github.com/ObaidNadeem/braille-draw</a>
     </div>
   </div>
 </div>
 
-<div class="timeline-section">
-  <div class="timeline-header">
-    <span class="timeline-label">Timeline</span>
-    <div class="playback-controls">
-      <button onclick="stepBackward()" title="Previous frame">&#9666;</button>
-      <button id="play-btn" onclick="togglePlay()" title="Play / Pause">&#9654; Play</button>
-      <button onclick="stepForward()" title="Next frame">&#9656;</button>
+<!-- Timeline dock -->
+<div class="timeline-dock">
+  <div class="transport-bar">
+    <div class="transport-left">
+      <button class="pb-btn" onclick="stepBackward()" aria-label="Previous frame" title="Previous frame (&#8592;)">&#9666;</button>
+      <button class="pb-play" id="play-btn" onclick="togglePlay()" title="Play / Pause (Space)">&#9654; Play</button>
+      <button class="pb-btn" onclick="stepForward()" aria-label="Next frame" title="Next frame (&#8594;)">&#9656;</button>
       <div class="sep"></div>
-      <span class="frame-counter" id="frame-counter">1 / 1</span>
+      <span class="frame-counter" id="frame-counter" aria-live="polite">1 / 1</span>
       <div class="sep"></div>
-      <div class="fps-control">
-        <label>FPS</label>
+      <div class="fps-group">
+        <label for="fps-slider">FPS</label>
         <input type="range" id="fps-slider" min="1" max="24" value="4" oninput="setAnimFPS(this.value)">
-        <span class="fps-value" id="fps-value">4</span>
+        <span class="fps-val" id="fps-value">4</span>
       </div>
       <div class="sep"></div>
-      <button id="loop-btn" class="toggle-btn active" onclick="toggleLoop()" title="Loop">Loop</button>
-      <button id="onion-btn" class="toggle-btn" onclick="toggleOnion()" title="Onion skin">Onion</button>
+      <button id="loop-btn" class="tgl active" onclick="toggleLoop()" title="Loop">Loop</button>
+      <button id="onion-btn" class="tgl" onclick="toggleOnion()" title="Onion skin">Onion</button>
+    </div>
+    <div class="transport-spacer"></div>
+    <div class="transport-right">
+      <button onclick="addFrame()" title="New frame (N)">+ New</button>
+      <button onclick="duplicateFrame()">Dup</button>
+      <button onclick="deleteFrame()">Del</button>
+      <div class="sep"></div>
+      <button onclick="moveFrameLeft()" aria-label="Move frame left">&#9666;</button>
+      <button onclick="moveFrameRight()" aria-label="Move frame right">&#9656;</button>
     </div>
   </div>
-
-  <div class="timeline-strip" id="timeline-strip"></div>
-
-  <div class="frame-actions">
-    <button onclick="addFrame()">+ New</button>
-    <button onclick="duplicateFrame()">Duplicate</button>
-    <button onclick="deleteFrame()">Delete</button>
-    <div class="sep"></div>
-    <button onclick="moveFrameLeft()">&#9666; Move</button>
-    <button onclick="moveFrameRight()">Move &#9656;</button>
-  </div>
+  <div class="frame-strip" id="timeline-strip"></div>
 </div>
 
-<div class="info">
-  Click dots to toggle. Click + drag to paint.
-  Hold <kbd>Shift</kbd> to erase while dragging.<br>
-  <kbd>D</kbd> Draw <kbd>E</kbd> Erase
-  <kbd>F</kbd> Fill <kbd>I</kbd> Invert <kbd>C</kbd> Clear<br>
-  <kbd>&#8592;</kbd><kbd>&#8594;</kbd> Frames
-  <kbd>Space</kbd> Play/Pause
-  <kbd>N</kbd> New Frame
-</div>
-
-<script>
-// ── Braille bit mapping ──
-const DOT_BITS = [
-  [0x01, 0x08],
-  [0x02, 0x10],
-  [0x04, 0x20],
-  [0x40, 0x80],
-];
-
-// ── State ──
-let cellCols = 2;
-let cellRows = 1;
-let pixelW, pixelH;
-let pixels;
-let mode = 'draw';
-let painting = false;
-let paintValue = 1;
-
-// Animation state
-let frames = [];
-let currentFrame = 0;
-let isPlaying = false;
-let animFPS = 4;
-let loopAnim = true;
-let onionSkin = false;
-let playTimer = null;
-
-// ── DOM refs ──
-const gridEl = document.getElementById('grid');
-const labelEl = document.getElementById('grid-label');
-const colsEl = document.getElementById('cols');
-const rowsEl = document.getElementById('rows');
-const stripEl = document.getElementById('timeline-strip');
-const frameCounterEl = document.getElementById('frame-counter');
-const playBtnEl = document.getElementById('play-btn');
-const fpsValueEl = document.getElementById('fps-value');
-
-// ── Grid helpers ──
-
-function makeEmptyGrid() {
-  return Array.from({ length: pixelH }, () =>
-    Array.from({ length: pixelW }, () => 0)
-  );
-}
-
-function cloneGrid(grid) {
-  return grid.map(row => [...row]);
-}
-
-// ── Init ──
-
-function init() {
-  cellCols = parseInt(colsEl.value);
-  cellRows = parseInt(rowsEl.value);
-  pixelW = cellCols * 2;
-  pixelH = cellRows * 4;
-
-  if (frames.length === 0) {
-    frames = [makeEmptyGrid()];
-    currentFrame = 0;
-  } else {
-    frames = frames.map(oldFrame =>
-      Array.from({ length: pixelH }, (_, r) =>
-        Array.from({ length: pixelW }, (_, c) =>
-          r < oldFrame.length && c < oldFrame[0].length ? oldFrame[r][c] : 0
-        )
-      )
-    );
-  }
-
-  pixels = frames[currentFrame];
-  buildGrid();
-  updateOutput();
-  renderTimeline();
-}
-
-// ── Grid ──
-
-function buildGrid() {
-  gridEl.innerHTML = '';
-  const prevFrame = onionSkin && currentFrame > 0 ? frames[currentFrame - 1] : null;
-
-  for (let r = 0; r < pixelH; r++) {
-    const rowEl = document.createElement('div');
-    rowEl.className = 'grid-row';
-
-    for (let c = 0; c < pixelW; c++) {
-      const dot = document.createElement('div');
-      dot.className = 'dot';
-      if (pixels[r][c]) dot.classList.add('on');
-      else if (prevFrame && prevFrame[r][c]) dot.classList.add('ghost');
-
-      if (c % 2 === 1 && c < pixelW - 1) dot.classList.add('cell-right-edge');
-      if (r % 4 === 3 && r < pixelH - 1) dot.classList.add('cell-bottom-edge');
-
-      dot.dataset.r = r;
-      dot.dataset.c = c;
-
-      dot.addEventListener('pointerdown', onDotDown);
-      dot.addEventListener('pointerenter', onDotEnter);
-
-      rowEl.appendChild(dot);
-    }
-
-    gridEl.appendChild(rowEl);
-  }
-
-  const totalChars = cellCols * cellRows;
-  labelEl.innerHTML = `${pixelW} &times; ${pixelH} pixels &mdash; ${totalChars} char${totalChars > 1 ? 's' : ''}`;
-}
-
-function refreshGridDots() {
-  const dots = gridEl.querySelectorAll('.dot');
-  const prevFrame = onionSkin && currentFrame > 0 ? frames[currentFrame - 1] : null;
-
-  dots.forEach(dot => {
-    const r = parseInt(dot.dataset.r);
-    const c = parseInt(dot.dataset.c);
-    const isOn = !!pixels[r][c];
-    dot.classList.toggle('on', isOn);
-    dot.classList.toggle('ghost', !isOn && !!prevFrame && !!prevFrame[r][c]);
-  });
-}
-
-// ── Drawing ──
-
-function onDotDown(e) {
-  e.preventDefault();
-  stopPlayback();
-  painting = true;
-
-  const r = parseInt(e.target.dataset.r);
-  const c = parseInt(e.target.dataset.c);
-
-  if (e.shiftKey) {
-    paintValue = 0;
-  } else if (mode === 'erase') {
-    paintValue = 0;
-  } else {
-    paintValue = pixels[r][c] ? 0 : 1;
-  }
-
-  setPixel(r, c, paintValue);
-  updateOutput();
-}
-
-function onDotEnter(e) {
-  if (!painting) return;
-  const r = parseInt(e.target.dataset.r);
-  const c = parseInt(e.target.dataset.c);
-  setPixel(r, c, paintValue);
-  updateOutput();
-}
-
-document.addEventListener('pointerup', () => { painting = false; });
-
-function setPixel(r, c, val) {
-  pixels[r][c] = val;
-  const dot = gridEl.querySelector(`.dot[data-r="${r}"][data-c="${c}"]`);
-  if (dot) {
-    dot.classList.toggle('on', !!val);
-    dot.classList.remove('ghost');
-  }
-}
-
-function setMode(m) {
-  mode = m;
-  document.getElementById('mode-draw').classList.toggle('active', m === 'draw');
-  document.getElementById('mode-erase').classList.toggle('active', m === 'erase');
-}
-
-function clearGrid() {
-  for (let r = 0; r < pixelH; r++)
-    for (let c = 0; c < pixelW; c++)
-      pixels[r][c] = 0;
-  buildGrid();
-  updateOutput();
-}
-
-function fillAll() {
-  for (let r = 0; r < pixelH; r++)
-    for (let c = 0; c < pixelW; c++)
-      pixels[r][c] = 1;
-  buildGrid();
-  updateOutput();
-}
-
-function invertAll() {
-  for (let r = 0; r < pixelH; r++)
-    for (let c = 0; c < pixelW; c++)
-      pixels[r][c] = pixels[r][c] ? 0 : 1;
-  buildGrid();
-  updateOutput();
-}
-
-// ── Output computation ──
-
-function computeBraille(grid) {
-  if (!grid) grid = pixels;
-  const lines = [];
-  for (let cr = 0; cr < cellRows; cr++) {
-    let line = '';
-    for (let cc = 0; cc < cellCols; cc++) {
-      let mask = 0;
-      for (let dr = 0; dr < 4; dr++) {
-        for (let dc = 0; dc < 2; dc++) {
-          const pr = cr * 4 + dr;
-          const pc = cc * 2 + dc;
-          if (grid[pr][pc]) {
-            mask |= DOT_BITS[dr][dc];
-          }
-        }
-      }
-      line += String.fromCodePoint(0x2800 + mask);
-    }
-    lines.push(line);
-  }
-  return lines;
-}
-
-function computeASCII(grid) {
-  if (!grid) grid = pixels;
-  const lines = [];
-  for (let r = 0; r < pixelH; r++) {
-    let line = '';
-    for (let c = 0; c < pixelW; c++) {
-      line += grid[r][c] ? '##' : '..';
-    }
-    lines.push(line);
-  }
-  return lines;
-}
-
-function computeTermdot(grid) {
-  if (!grid) grid = pixels;
-  let str = '';
-  for (let r = 0; r < pixelH; r++) {
-    for (let c = 0; c < pixelW; c++) {
-      str += grid[r][c] ? '*' : '.';
-    }
-  }
-  return str;
-}
-
-function updateOutput(skipAnimExport) {
-  const brailleLines = computeBraille();
-  const asciiLines = computeASCII();
-
-  document.getElementById('out-braille').textContent = brailleLines.join('\n');
-
-  const unicodeStr = brailleLines.map(line =>
-    [...line].map(ch => 'U+' + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')).join(' ')
-  ).join('\n');
-  document.getElementById('out-unicode').textContent = unicodeStr;
-
-  document.getElementById('out-ascii').textContent = asciiLines.join('\n');
-
-  document.getElementById('out-termdot').textContent = '"' + computeTermdot() + '"';
-
-  const jsStr = brailleLines.length === 1
-    ? `'${brailleLines[0]}'`
-    : brailleLines.map(l => `'${l}'`).join(' + \'\\n\' +\n');
-  document.getElementById('out-js').textContent = jsStr;
-
-  updateCurrentThumb();
-  if (!skipAnimExport) updateAnimExport();
-}
-
-// ── Frame management ──
-
-function addFrame() {
-  stopPlayback();
-  frames.splice(currentFrame + 1, 0, makeEmptyGrid());
-  currentFrame++;
-  pixels = frames[currentFrame];
-  buildGrid();
-  updateOutput();
-  renderTimeline();
-}
-
-function duplicateFrame() {
-  stopPlayback();
-  frames.splice(currentFrame + 1, 0, cloneGrid(frames[currentFrame]));
-  currentFrame++;
-  pixels = frames[currentFrame];
-  buildGrid();
-  updateOutput();
-  renderTimeline();
-}
-
-function deleteFrame() {
-  if (frames.length <= 1) return;
-  stopPlayback();
-  frames.splice(currentFrame, 1);
-  if (currentFrame >= frames.length) currentFrame = frames.length - 1;
-  pixels = frames[currentFrame];
-  buildGrid();
-  updateOutput();
-  renderTimeline();
-}
-
-function moveFrameLeft() {
-  if (currentFrame <= 0) return;
-  stopPlayback();
-  [frames[currentFrame - 1], frames[currentFrame]] = [frames[currentFrame], frames[currentFrame - 1]];
-  currentFrame--;
-  pixels = frames[currentFrame];
-  renderTimeline();
-  updateAnimExport();
-}
-
-function moveFrameRight() {
-  if (currentFrame >= frames.length - 1) return;
-  stopPlayback();
-  [frames[currentFrame + 1], frames[currentFrame]] = [frames[currentFrame], frames[currentFrame + 1]];
-  currentFrame++;
-  pixels = frames[currentFrame];
-  renderTimeline();
-  updateAnimExport();
-}
-
-function switchToFrame(index) {
-  currentFrame = index;
-  pixels = frames[currentFrame];
-  refreshGridDots();
-  updateOutput(isPlaying);
-  updateActiveThumb();
-}
-
-// ── Playback ──
-
-function togglePlay() {
-  if (isPlaying) stopPlayback();
-  else startPlayback();
-}
-
-function startPlayback() {
-  if (frames.length <= 1) return;
-  isPlaying = true;
-  updatePlayBtn();
-  playTick();
-}
-
-function stopPlayback() {
-  isPlaying = false;
-  if (playTimer) {
-    clearTimeout(playTimer);
-    playTimer = null;
-  }
-  updatePlayBtn();
-  updateAnimExport();
-}
-
-function playTick() {
-  if (!isPlaying) return;
-
-  let next = currentFrame + 1;
-  if (next >= frames.length) {
-    if (loopAnim) {
-      next = 0;
-    } else {
-      stopPlayback();
-      return;
-    }
-  }
-
-  switchToFrame(next);
-  playTimer = setTimeout(playTick, 1000 / animFPS);
-}
-
-function stepForward() {
-  stopPlayback();
-  switchToFrame((currentFrame + 1) % frames.length);
-}
-
-function stepBackward() {
-  stopPlayback();
-  switchToFrame((currentFrame - 1 + frames.length) % frames.length);
-}
-
-function setAnimFPS(val) {
-  animFPS = parseInt(val);
-  fpsValueEl.textContent = animFPS;
-  if (isPlaying) {
-    if (playTimer) clearTimeout(playTimer);
-    playTimer = setTimeout(playTick, 1000 / animFPS);
-  }
-  updateAnimExport();
-}
-
-function toggleLoop() {
-  loopAnim = !loopAnim;
-  document.getElementById('loop-btn').classList.toggle('active', loopAnim);
-}
-
-function toggleOnion() {
-  onionSkin = !onionSkin;
-  document.getElementById('onion-btn').classList.toggle('active', onionSkin);
-  refreshGridDots();
-}
-
-function updatePlayBtn() {
-  playBtnEl.innerHTML = isPlaying ? '&#9646;&#9646; Pause' : '&#9654; Play';
-}
-
-// ── Timeline rendering ──
-
-function renderTimeline() {
-  stripEl.innerHTML = '';
-
-  frames.forEach((frame, i) => {
-    const thumb = document.createElement('div');
-    thumb.className = 'frame-thumb' + (i === currentFrame ? ' active' : '');
-
-    const num = document.createElement('span');
-    num.className = 'frame-num';
-    num.textContent = i + 1;
-    thumb.appendChild(num);
-
-    const preview = document.createElement('div');
-    preview.className = 'frame-preview';
-    preview.textContent = computeBraille(frame).join('\n');
-    thumb.appendChild(preview);
-
-    thumb.addEventListener('click', () => {
-      stopPlayback();
-      switchToFrame(i);
-    });
-
-    stripEl.appendChild(thumb);
-  });
-
-  const addBtn = document.createElement('button');
-  addBtn.className = 'frame-add-btn';
-  addBtn.textContent = '+';
-  addBtn.title = 'Add new frame (N)';
-  addBtn.addEventListener('click', addFrame);
-  stripEl.appendChild(addBtn);
-
-  updateActiveThumb();
-}
-
-function updateActiveThumb() {
-  const thumbs = stripEl.querySelectorAll('.frame-thumb');
-  thumbs.forEach((thumb, i) => {
-    thumb.classList.toggle('active', i === currentFrame);
-  });
-  frameCounterEl.textContent = `${currentFrame + 1} / ${frames.length}`;
-
-  if (thumbs[currentFrame]) {
-    thumbs[currentFrame].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }
-}
-
-function updateCurrentThumb() {
-  const thumbs = stripEl.querySelectorAll('.frame-thumb');
-  if (thumbs[currentFrame]) {
-    const preview = thumbs[currentFrame].querySelector('.frame-preview');
-    if (preview) {
-      preview.textContent = computeBraille().join('\n');
-    }
-  }
-}
-
-// ── Animation export ──
-
-function computeAnimExport() {
-  const format = document.getElementById('anim-format').value;
-
-  if (format === 'js-braille') {
-    const items = frames.map(frame => {
-      const lines = computeBraille(frame);
-      return lines.length === 1 ? lines[0] : lines.join('\n');
-    });
-    return 'const frames = [\n' +
-      items.map(s => `  ${JSON.stringify(s)},`).join('\n') +
-      '\n];';
-  }
-
-  if (format === 'js-termdot') {
-    const items = frames.map(frame => computeTermdot(frame));
-    return 'const frames = [\n' +
-      items.map(s => `  ${JSON.stringify(s)},`).join('\n') +
-      '\n];';
-  }
-
-  if (format === 'js-grid') {
-    const items = frames.map(frame => JSON.stringify(frame));
-    return 'const frames = [\n' +
-      items.map(s => `  ${s},`).join('\n') +
-      '\n];';
-  }
-
-  if (format === 'json') {
-    const data = {
-      cols: cellCols,
-      rows: cellRows,
-      fps: animFPS,
-      frames: frames.map(frame => computeBraille(frame))
-    };
-    return JSON.stringify(data, null, 2);
-  }
-
-  return '';
-}
-
-function updateAnimExport() {
-  document.getElementById('out-anim').textContent = computeAnimExport();
-}
-
-// ── Copy ──
-
-function copyOutput(type, btn) {
-  let text;
-  if (type === 'braille') text = document.getElementById('out-braille').textContent;
-  else if (type === 'unicode') text = document.getElementById('out-unicode').textContent;
-  else if (type === 'ascii') text = document.getElementById('out-ascii').textContent;
-  else if (type === 'termdot') text = document.getElementById('out-termdot').textContent;
-  else if (type === 'js') text = document.getElementById('out-js').textContent;
-  else if (type === 'anim') text = document.getElementById('out-anim').textContent;
-
-  navigator.clipboard.writeText(text).then(() => {
-    btn.textContent = 'Copied';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.textContent = 'Copy';
-      btn.classList.remove('copied');
-    }, 1200);
-  });
-}
-
-// ── Events ──
-
-colsEl.addEventListener('change', init);
-rowsEl.addEventListener('change', init);
-
-document.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-
-  if (e.key === 'c' && !e.metaKey && !e.ctrlKey) clearGrid();
-  if (e.key === 'f') fillAll();
-  if (e.key === 'i') invertAll();
-  if (e.key === 'd') setMode('draw');
-  if (e.key === 'e') setMode('erase');
-  if (e.key === 'ArrowLeft') { e.preventDefault(); stepBackward(); }
-  if (e.key === 'ArrowRight') { e.preventDefault(); stepForward(); }
-  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
-  if (e.key === 'n') addFrame();
-});
-
-// Init
-init();
-</script>
-
+<script src="app.js"></script>
 </body>
 </html>
